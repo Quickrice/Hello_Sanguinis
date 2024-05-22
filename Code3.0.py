@@ -1,4 +1,3 @@
-
 import streamlit as st
 
 import hashlib
@@ -6,17 +5,23 @@ import hashlib
 import json
 
 import os
+
  
+
 # File to store user data
 
 USER_DATA_FILE = "user_data.json"
+
  
+
 # Function to hash passwords
 
 def hash_password(password):
 
     return hashlib.sha256(password.encode()).hexdigest()
+
  
+
 # Function to load user data from the JSON file
 
 def load_user_data():
@@ -25,10 +30,16 @@ def load_user_data():
 
         with open(USER_DATA_FILE, "r") as file:
 
-            return json.load(file)
+            data = json.load(file)
+
+            print(f"Loaded user data: {data}")  # Debug statement
+
+            return data
 
     return {}
+
  
+
 # Function to save user data to the JSON file
 
 def save_user_data(user_data):
@@ -36,7 +47,11 @@ def save_user_data(user_data):
     with open(USER_DATA_FILE, "w") as file:
 
         json.dump(user_data, file)
+
+        print(f"Saved user data: {user_data}")  # Debug statement
+
  
+
 # Function to handle user registration
 
 def register_user(email, password):
@@ -49,6 +64,8 @@ def register_user(email, password):
 
         return
 
+ 
+
     hashed_password = hash_password(password)
 
     user_data[email] = {"email": email, "password": hashed_password, "characters": []}
@@ -60,12 +77,16 @@ def register_user(email, password):
     st.session_state.logged_in = True
 
     st.session_state.characters = []
+
  
+
 # Function to handle user login
 
 def login_user(email, password):
 
     user_data = load_user_data()
+
+    st.write(f"Loaded user data: {user_data}")  # Debug statement
 
     if email not in user_data:
 
@@ -73,7 +94,11 @@ def login_user(email, password):
 
         return
 
+ 
+
     hashed_password = hash_password(password)
+
+    st.write(f"Hashed password: {hashed_password}")  # Debug statement
 
     if user_data[email]["password"] == hashed_password:
 
@@ -86,7 +111,21 @@ def login_user(email, password):
     else:
 
         st.error("Incorrect password")
+
  
+
+# Function to log out
+
+def logout():
+
+    st.session_state.logged_in = False
+
+    st.session_state.characters = []
+
+    st.success("Logged out successfully")
+
+ 
+
 # Function to create a new character
 
 def create_character():
@@ -94,6 +133,8 @@ def create_character():
     st.title("Create New Character")
 
     st.subheader("Character Traits")
+
+ 
 
     # Input fields for character traits
 
@@ -123,9 +164,9 @@ def create_character():
 
     special_traits = st.text_area("Special Traits", "Enter special traits here...")
 
-    # Image upload option for character picture
-
     character_image = st.file_uploader("Upload Character Image", type=["jpg", "jpeg", "png"])
+
+ 
 
     if st.button("Create Character"):
 
@@ -163,12 +204,16 @@ def create_character():
 
         }
 
+ 
+
         st.session_state.characters.append(character_data)
 
         save_character_data(st.session_state.characters)
 
         st.success("Character created successfully")
+
  
+
 # Function to edit an existing character
 
 def edit_character():
@@ -179,11 +224,11 @@ def edit_character():
 
     selected_character = st.selectbox("Select Character to Edit", characters)
 
-    selected_character_data = [character for character in st.session_state.characters if character["name"] == selected_character][0]
+    selected_character_data = next(character for character in st.session_state.characters if character["name"] == selected_character)
+
+ 
 
     st.subheader("Edit Character Traits")
-
-    # Input fields for character traits
 
     selected_character_data["name"] = st.text_input("Name", selected_character_data["name"])
 
@@ -211,7 +256,7 @@ def edit_character():
 
     selected_character_data["special_traits"] = st.text_area("Special Traits", selected_character_data["special_traits"])
 
-    # Image upload option for character picture
+ 
 
     character_image = st.file_uploader("Upload Character Image", type=["jpg", "jpeg", "png"], key="edit_image")
 
@@ -219,12 +264,16 @@ def edit_character():
 
         selected_character_data["image"] = character_image
 
+ 
+
     if st.button("Save Changes"):
 
         save_character_data(st.session_state.characters)
 
         st.success("Character changes saved successfully")
+
  
+
 # Function to load created characters
 
 def load_characters():
@@ -248,17 +297,9 @@ def load_characters():
     else:
 
         st.write("No characters created yet.")
+
  
-# Function to log out
 
-def logout():
-
-    st.session_state.logged_in = False
-
-    st.session_state.characters = []
-
-    st.success("Logged out successfully")
- 
 # Function to save character data
 
 def save_character_data(characters):
@@ -268,7 +309,9 @@ def save_character_data(characters):
     user_data[st.session_state.email]["characters"] = characters
 
     save_user_data(user_data)
+
  
+
 # Main function
 
 def main():
@@ -276,18 +319,24 @@ def main():
     # Display logo at the top of the app
 
     st.image("logo.jpeg", width=200)
- 
+
     st.title("Character Logbook")
+
+ 
 
     if "logged_in" not in st.session_state:
 
         st.session_state.logged_in = False
+
+ 
 
     if st.session_state.logged_in:
 
         st.sidebar.title("Options")
 
         option = st.sidebar.selectbox("Choose an option", ("Create New Character", "Edit Character", "Load Characters", "Log Out"))
+
+ 
 
         if option == "Create New Character":
 
@@ -315,6 +364,8 @@ def main():
 
         password = st.text_input("Password", type="password")
 
+ 
+
         if st.button(login_or_register):
 
             st.session_state.email = email
@@ -326,7 +377,10 @@ def main():
             else:
 
                 register_user(email, password)
+
  
+
 if __name__ == "__main__":
 
     main()
+
