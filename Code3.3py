@@ -2,7 +2,9 @@ import streamlit as st
 import hashlib
 import json
 import os
+import base64
 from PIL import Image
+from io import BytesIO
 
 # File to store user data
 USER_DATA_FILE = "user_data.json"
@@ -70,6 +72,17 @@ def logout():
     st.session_state.email = None
     st.success("Logged out successfully")
 
+# Function to convert image to base64
+def image_to_base64(image):
+    buffered = BytesIO()
+    img = Image.open(image)
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
+
+# Function to convert base64 to image
+def base64_to_image(base64_str):
+    return Image.open(BytesIO(base64.b64decode(base64_str)))
+
 # Function to create a new character
 def create_character():
     st.title("Create New Character")
@@ -112,7 +125,7 @@ def create_character():
 
         # Handle image upload
         if character_image:
-            character_data["image"] = character_image.read()
+            character_data["image"] = image_to_base64(character_image)
 
         st.session_state.characters.append(character_data)
         save_character_data(st.session_state.characters)
@@ -142,7 +155,7 @@ def edit_character():
 
     character_image = st.file_uploader("Upload Character Image", type=["jpg", "jpeg", "png"], key="edit_image")
     if character_image:
-        selected_character_data["image"] = character_image.read()
+        selected_character_data["image"] = image_to_base64(character_image)
 
     if st.button("Save Changes"):
         save_character_data(st.session_state.characters)
@@ -155,7 +168,7 @@ def load_characters():
         for character in st.session_state.characters:
             st.write(f"Name: {character['name']}")
             if character['image']:
-                st.image(character['image'], caption=character['name'], width=150)
+                st.image(base64_to_image(character['image']), caption=character['name'], width=150)
             else:
                 st.write("No image available for this character.")
     else:
@@ -186,6 +199,7 @@ def main():
             edit_character()
         elif option == "Load Characters":
             load_characters()
+    
         elif option == "Log Out":
             logout()
     else:
