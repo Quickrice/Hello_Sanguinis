@@ -2,6 +2,7 @@ import streamlit as st
 import hashlib
 import json
 import os
+from PIL import Image
 
 # File to store user data
 USER_DATA_FILE = "user_data.json"
@@ -42,6 +43,7 @@ def register_user(email, password):
     st.success(f"Registered user with email: {email}")
     st.session_state.logged_in = True
     st.session_state.characters = []
+    st.session_state.email = email  # Ensure email is stored in session state
 
 # Function to handle user login
 def login_user(email, password):
@@ -57,6 +59,7 @@ def login_user(email, password):
         st.success(f"Logged in user with email: {email}")
         st.session_state.logged_in = True
         st.session_state.characters = user_data[email].get("characters", [])
+        st.session_state.email = email  # Ensure email is stored in session state
     else:
         st.error("Incorrect password")
 
@@ -64,6 +67,7 @@ def login_user(email, password):
 def logout():
     st.session_state.logged_in = False
     st.session_state.characters = []
+    st.session_state.email = None
     st.success("Logged out successfully")
 
 # Function to create a new character
@@ -103,8 +107,12 @@ def create_character():
             "perks": perks,
             "flaws": flaws,
             "special_traits": special_traits,
-            "image": character_image
+            "image": None
         }
+
+        # Handle image upload
+        if character_image:
+            character_data["image"] = character_image.read()
 
         st.session_state.characters.append(character_data)
         save_character_data(st.session_state.characters)
@@ -134,7 +142,7 @@ def edit_character():
 
     character_image = st.file_uploader("Upload Character Image", type=["jpg", "jpeg", "png"], key="edit_image")
     if character_image:
-        selected_character_data["image"] = character_image
+        selected_character_data["image"] = character_image.read()
 
     if st.button("Save Changes"):
         save_character_data(st.session_state.characters)
