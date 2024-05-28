@@ -1,67 +1,84 @@
 import streamlit as st
 import hashlib
 import json
+import sqlite3
 import os
 import base64
 from PIL import Image
 from io import BytesIO
 
-# File to store user data
-USER_DATA_FILE = "user_data.json"
+# Initialize SQLite database
+conn = sqlite3.connect('user_data.db')
+cursor = conn.cursor()
+
+# Create users table if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+                     email TEXT PRIMARY KEY,
+                     password TEXT
+                   )''')
+
+# Create characters table if it doesn't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS characters (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     email TEXT,
+                     name TEXT,
+                     age INTEGER,
+                     gender TEXT,
+                     race TEXT,
+                     body_type TEXT,
+                     eye_color TEXT,
+                     hair_color TEXT,
+                     skin_color TEXT,
+                     skin_condition TEXT,
+                     characteristics TEXT,
+                     perks TEXT,
+                     flaws TEXT,
+                     special_traits TEXT,
+                     image TEXT,
+                     FOREIGN KEY (email) REFERENCES users (email)
+                   )''')
+conn.commit()
 
 # Function to hash passwords
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# Function to load user data from the JSON file
-def load_user_data():
-    if os.path.exists(USER_DATA_FILE):
-        try:
-            with open(USER_DATA_FILE, "r") as file:
-                data = json.load(file)
-                print(f"Loaded user data: {data}")  # Debug statement
-                return data
-        except json.JSONDecodeError:
-            print("JSONDecodeError: The JSON file is empty or contains invalid data.")
-            return {}
-    return {}
+# Function to load user data from the SQLite database
+def load_user_data(email):
+    cursor.execute('SELECT password FROM users WHERE email=?', (email,))
+    user = cursor.fetchone()
+    return user
 
-# Function to save user data to the JSON file
-def save_user_data(user_data):
-    with open(USER_DATA_FILE, "w") as file:
-        json.dump(user_data, file)
-        print(f"Saved user data: {user_data}")  # Debug statement
+# Function to save user data to the SQLite database
+def save_user_data(email, password):
+    cursor.execute('INSERT INTO users (email, password) VALUES (?, ?)', (email, hash_password(password)))
+    conn.commit()
 
 # Function to handle user registration
 def register_user(email, password):
-    user_data = load_user_data()
-    if email in user_data:
+    if load_user_data(email):
         st.error("Email already registered")
         return
 
-    hashed_password = hash_password(password)
-    user_data[email] = {"email": email, "password": hashed_password, "characters": []}
-    save_user_data(user_data)
+    save_user_data(email, password)
     st.success(f"Registered user with email: {email}")
     st.session_state.logged_in = True
+    st.session_state.email = email
     st.session_state.characters = []
-    st.session_state.email = email  # Ensure email is stored in session state
 
 # Function to handle user login
 def login_user(email, password):
-    user_data = load_user_data()
-    st.write(f"Loaded user data: {user_data}")  # Debug statement
-    if email not in user_data:
+    user = load_user_data(email)
+    if not user:
         st.error("Email not registered")
         return
 
     hashed_password = hash_password(password)
-    st.write(f"Hashed password: {hashed_password}")  # Debug statement
-    if user_data[email]["password"] == hashed_password:
+    if user[0] == hashed_password:
         st.success(f"Logged in user with email: {email}")
         st.session_state.logged_in = True
-        st.session_state.characters = user_data[email].get("characters", [])
-        st.session_state.email = email  # Ensure email is stored in session state
+        st.session_state.email = email
+        st.session_state.characters = load_user_characters(email)
     else:
         st.error("Incorrect password")
 
@@ -82,6 +99,40 @@ def image_to_base64(image):
 # Function to convert base64 to image
 def base64_to_image(base64_str):
     return Image.open(BytesIO(base64.b64decode(base64_str)))
+
+# Function to save character data
+def save_character_data(email, characters):
+    cursor.execute('DELETE FROM characters WHERE email=?', (email,))
+    for character in characters:
+        cursor.execute('''INSERT INTO characters (email, name, age, gender, race, body_type, eye_color, hair_color, skin_color, skin_condition, characteristics, perks, flaws, special_traits, image) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                       (email, character['name'], character['age'], character['gender'], character['race'], character['body_type'], character['eye_color'], character['hair_color'], character['skin_color'], character['skin_condition'], character['characteristics'], character['perks'], character['flaws'], character['special_traits'], character['image']))
+    conn.commit()
+
+# Function to load user characters from the SQLite database
+def load_user_characters(email):
+    cursor.execute('SELECT name, age, gender, race, body_type, eye_color, hair_color, skin_color, skin_condition, characteristics, perks, flaws, special_traits, image FROM characters WHERE email=?', (email,))
+    characters = cursor.fetchall()
+    character_list = []
+    for character in characters:
+        character_data = {
+            "name": character[0],
+            "age": character[1],
+            "gender": character[2],
+            "race": character[3],
+            "body_type": character[4],
+            "eye_color": character[5],
+            "hair_color": character[6],
+            "skin_color": character[7],
+            "skin_condition": character[8],
+            "characteristics": character[9],
+            "perks": character[10],
+            "flaws": character[11],
+            "special_traits": character[12],
+            "image": character[13]
+        }
+        character_list.append(character_data)
+    return character_list
 
 # Function to create a new character
 def create_character():
@@ -128,7 +179,7 @@ def create_character():
             character_data["image"] = image_to_base64(character_image)
 
         st.session_state.characters.append(character_data)
-        save_character_data(st.session_state.characters)
+        save_character_data(st.session_state.email, st.session_state.characters)
         st.success("Character created successfully")
 
 # Function to edit an existing character
@@ -158,7 +209,7 @@ def edit_character():
         selected_character_data["image"] = image_to_base64(character_image)
 
     if st.button("Save Changes"):
-        save_character_data(st.session_state.characters)
+        save_character_data(st.session_state.email, st.session_state.characters)
         st.success("Character changes saved successfully")
 
 # Function to load created characters
@@ -173,12 +224,6 @@ def load_characters():
                 st.write("No image available for this character.")
     else:
         st.write("No characters created yet.")
-
-# Function to save character data
-def save_character_data(characters):
-    user_data = load_user_data()
-    user_data[st.session_state.email]["characters"] = characters
-    save_user_data(user_data)
 
 # Main function
 def main():
@@ -199,7 +244,6 @@ def main():
             edit_character()
         elif option == "Load Characters":
             load_characters()
-    
         elif option == "Log Out":
             logout()
     else:
